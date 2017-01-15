@@ -28,17 +28,19 @@ test -z $(docker ps -aqf name=firefox) && {
     unset dri_devices
     declare -a dri_devices
     for d in `find /dev/dri -type c`; do
-        dri_devices+=(--device "${d}");
+        dri_devices+=(--device "${d}":"${d}");
     done
 
     docker create --name firefox -it \
         --env DISPLAY="${DISPLAY}" \
+        --cap-add=NET_ADMIN \
+        --device /dev/net/tun \
         "${dri_devices[@]}" \
         --volume /run/user/"${UID}"/pulse/native:/tmp/pulse-unix \
         --volume /etc/localtime:/etc/localtime:ro \
         --volume /etc/timezone:/etc/timezone:ro \
         --volume /tmp/.X11-unix:/tmp/.X11-unix \
-        firefox
+        firefox -safe-mode --no-remote
 }
 
 docker start firefox
