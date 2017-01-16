@@ -20,28 +20,31 @@
 
 set -e
 
-(docker images -q firefox | grep -qE '[a-z0-9]+') || {
-    docker build --no-cache --force-rm -t firefox .
+(docker images -q chrome | grep -qE '[a-z0-9]+') || {
+    docker build --no-cache --force-rm -t chrome .
 }
 
-(docker ps -aqf name=firefox | grep -qE '[a-z0-9]+') || {
-    unset dri_devices
-    declare -a dri_devices
-    for d in `find /dev/dri -type c`; do
-        dri_devices+=(--device "${d}":"${d}");
-    done
+xhost si:localuser:$USER
 
+(pax11publish -d | grep -qE '.+') || {
+    start-pulseaudio-x11
+}
+
+(docker ps -aqf name=chrome | grep -qE '[a-z0-9]+') || {
     docker create -i \
-        --name firefox \
-        --env DISPLAY="${DISPLAY}" \
+        --name chrome \
         --cap-add=NET_ADMIN \
         --device /dev/net/tun \
-        "${dri_devices[@]}" \
-        --volume /run/user/"${UID}"/pulse/native:/tmp/pulse-unix \
-        --volume /etc/localtime:/etc/localtime:ro \
-        --volume /etc/timezone:/etc/timezone:ro \
-        --volume /tmp/.X11-unix:/tmp/.X11-unix \
-        firefox -safe-mode --no-remote
+        -v /etc/localtime:/etc/localtime:ro \
+        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        -e DISPLAY=$DISPLAY \
+        -e PULSE_SERVER=tcp:localhost:4713 \
+        -e PULSE_COOKIE_DATA=`pax11publish -d | grep --color=never -Po '(?<=^Cookie: ).*'` \
+        --group-add audio \
+        --group-add video \
+        --user `id -u`:`getent group video | cut -d: -f3` \
+        --device /dev/dri \
+        chrome
 }
 
-docker start firefox
+docker start chrome
